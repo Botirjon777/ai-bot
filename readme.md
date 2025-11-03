@@ -99,7 +99,7 @@ npm install
 # Update app/layout.tsx to include the chatbot
 ```
 
-### Step 5: Start Next.js Application
+### Step 5: Start Next.js application
 
 ```bash
 npm run dev
