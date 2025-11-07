@@ -1,9 +1,12 @@
+# app/services/session.py
+import json
 import secrets
 import hmac
 import hashlib
 from fastapi import Request, Depends, HTTPException
 import redis
 import os
+from datetime import datetime  # ← ADD THIS
 
 # ------------------------------------------------------------------ #
 # Config
@@ -40,6 +43,19 @@ def sign_session(session_id: str) -> str:
 
 def verify_session(session_id: str, signature: str) -> bool:
     return hmac.compare_digest(sign_session(session_id), signature)
+
+
+# ------------------------------------------------------------------ #
+# NEW: Publish message to Redis Pub/Sub
+# ------------------------------------------------------------------ #
+def publish_message(session_id: str, role: str, content: str):
+    channel = f"session:{session_id}"
+    payload = {
+        "role": role,
+        "content": content,
+        "timestamp": datetime.now().isoformat()
+    }
+    r.publish(channel, json.dumps(payload))
 
 
 # ------------------------------------------------------------------ #

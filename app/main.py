@@ -18,6 +18,7 @@ app.add_middleware(
 # ------------------------------------------------------------------ #
 # Import routers after app creation (avoid circular imports)
 # ------------------------------------------------------------------ #
-from .routes import chat, system  # noqa: E402
+from .routes import chat, system, admin  # noqa: E402
 app.include_router(chat.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
