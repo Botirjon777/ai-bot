@@ -1,11 +1,9 @@
-# app/routes/chat.py
+# app/routes/chat.py (UPDATED)
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 import json
-import redis
-import os
 import asyncio
 
 from ..services.session import (
@@ -13,8 +11,14 @@ from ..services.session import (
     get_client_ip, rate_limit, r as redis_client,
     publish_message
 )
-from ..services.search import search_products, contains_gpu
-from ..services.ollama import stream_ollama_response
+from ..services.enhanced_search import smart_search, ProductFeedback
+from ..services.enhanced_ollama import (
+    stream_enhanced_ollama_response,
+    IntentAnalyzer,
+    LearningSystem
+)
+from ..services.search import contains_gpu
+import os
 
 router = APIRouter()
 
@@ -29,6 +33,10 @@ class HumanRequest(BaseModel):
     name: str
     email: str
 
+class ProductClickRequest(BaseModel):
+    product_id: str
+    query: str
+
 # ------------------------------------------------------------------ #
 # Nonsense detection
 # ------------------------------------------------------------------ #
@@ -37,31 +45,6 @@ def is_nonsense(text: str) -> bool:
     if len(words) < 2:
         return True
     return len(set(words)) / len(words) < 0.3
-
-# ------------------------------------------------------------------ #
-# Helper: Stream Ollama → SSE + collect full text
-# ------------------------------------------------------------------ #
-async def ollama_stream_to_sse(messages: List[Dict], products: List[Dict]):
-    full_response = ""
-    try:
-        async for chunk in stream_ollama_response(messages, products):
-            yield chunk
-            if chunk.startswith("data: "):
-                try:
-                    data = json.loads(chunk[6:])
-                    if data.get("token"):
-                        full_response += data["token"]
-                except Exception:
-                    pass
-    except Exception as e:
-        print(f"Ollama error: {e}")
-        yield f"data: {json.dumps({'token': 'Sorry, service error.', 'done': True, 'error': True})}\n\n"
-    finally:
-        yield f"data: {json.dumps({'token': '', 'done': True})}\n\n"
-
-    # DO NOT RETURN ANYTHING FROM ASYNC GENERATOR
-    # full_response is captured in closure above
-
 
 # ------------------------------------------------------------------ #
 # Routes
@@ -103,9 +86,7 @@ async def chat(
             "suggested_products": None
         })
 
-    products = search_products(body.message)
-
-    # Load history
+    # Load conversation history
     key = f"session:{session_id}"
     history = redis_client.lrange(key, 0, -1)
     messages: List[Dict] = []
@@ -122,27 +103,50 @@ async def chat(
     redis_client.rpush(key, f"{user_msg['role']}:{user_msg['content']}")
     redis_client.expire(key, 86400)
 
-    # Publish immediately for admin panel
+    # Publish for admin panel
     publish_message(session_id, "user", body.message)
 
+    # ENHANCED: Extract specifications and perform smart search
+    specs = IntentAnalyzer.extract_specifications(body.message)
+    search_results = smart_search(body.message, specs, session_id)
+    
+    products = search_results["products"]
+    promotions = search_results["promotions"]
+
     # ------------------------------------------------------------------ #
-    # Streaming generator: Products + AI + Admin messages (live)
+    # Streaming with Enhanced AI
     # ------------------------------------------------------------------ #
     async def event_generator():
         full_response = ""
 
-        # 1. Send products
-        yield f"data: {json.dumps({'type': 'products', 'products': products[:3]})}\n\n"
+        # 1. Send products with promotion flags
+        products_to_send = []
+        for p in products[:5]:
+            product_data = {
+                "id": p["id"],
+                "title": p["title"],
+                "price": p["price"],
+                "vendor": p["vendor"]
+            }
+            if "promotion" in p:
+                product_data["promotion"] = p["promotion"]
+                product_data["discounted_price"] = p["discounted_price"]
+            products_to_send.append(product_data)
+        
+        yield f"data: {json.dumps({'type': 'products', 'products': products_to_send})}\n\n"
 
-        # 2. Set up Redis pub/sub for admin messages
+        # 2. Send promotions banner if available
+        if search_results["has_promotions"]:
+            yield f"data: {json.dumps({'type': 'promotions', 'message': '🔥 Special deals available!'})}\n\n"
+
+        # 3. Set up Redis pub/sub for admin messages
         pubsub = redis_client.pubsub()
         channel = f"session:{session_id}"
         pubsub.subscribe(channel)
 
-        # 3. Start consuming Ollama stream directly
+        # 4. Stream enhanced AI response
         try:
-            # Open Ollama async generator
-            ollama_gen = ollama_stream_to_sse(messages, products)
+            ollama_gen = stream_enhanced_ollama_response(messages, products, session_id)
             ollama_iter = ollama_gen.__aiter__()
 
             while True:
@@ -187,11 +191,14 @@ async def chat(
             except:
                 pass
 
-        # 4. Persist assistant response
+        # 5. Persist assistant response and log for learning
         if full_response.strip():
             redis_client.rpush(key, f"assistant:{full_response}")
             redis_client.expire(key, 86400)
             publish_message(session_id, "assistant", full_response)
+            
+            # Log search pattern for learning
+            LearningSystem.log_search_pattern(session_id, body.message, specs)
 
     return StreamingResponse(
         event_generator(),
@@ -202,6 +209,18 @@ async def chat(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post("/product-click")
+async def track_product_click(
+    request: Request,
+    body: ProductClickRequest,
+    session_id: str = Depends(get_session)
+):
+    """Track when user clicks on a product for learning"""
+    ProductFeedback.log_product_click(session_id, body.product_id, body.query)
+    LearningSystem.log_search_pattern(session_id, body.query, {}, body.product_id)
+    return {"status": "tracked"}
 
 
 @router.post("/human-request")
