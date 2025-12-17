@@ -1,0 +1,110 @@
+# Frequently Asked Questions
+
+categories:
+  - name: "General Information"
+    icon: "ℹ️"
+    questions:
+      - question: "What cable lengths do you offer?"
+        answer: "We offer cables from 0.5m to 30m depending on the type. Most common lengths are 1m, 2m, and 3m."
+        keywords: ["length", "size", "how long", "available lengths"]
+        priority: high
+      
+      - question: "What are your shipping options?"
+        answer: "We offer standard shipping (3-5 business days) and express shipping (1-2 business days). International shipping is available to most countries."
+        keywords: ["shipping", "delivery", "how long", "international"]
+        priority: high
+      
+      - question: "What is your return policy?"
+        answer: "We accept returns within 30 days of purchase for unused products in original packaging. Custom cables are non-returnable unless defective."
+        keywords: ["return", "refund", "exchange", "policy"]
+        priority: high
+  
+  - name: "Custom Cables"
+    icon: "🎨"
+    questions:
+      - question: "Do you make custom cables?"
+        answer: "Yes! We create custom cables with your preferred colors, lengths, and connectors. Custom orders typically take 5-7 business days."
+        keywords: ["custom", "personalized", "bespoke", "made to order"]
+        priority: high
+      
+      - question: "What colors are available for custom cables?"
+        answer: "We offer a wide range of colors including black, white, red, blue, green, purple, orange, and many more. We can also do multi-color sleeving."
+        keywords: ["color", "colors", "custom color", "sleeving"]
+        priority: medium
+      
+      - question: "Can I get custom lengths?"
+        answer: "Absolutely! We can make cables in any length from 0.3m to 5m for most cable types. Just specify your requirements."
+        keywords: ["custom length", "specific length", "exact length"]
+        priority: medium
+  
+  - name: "Product Compatibility"
+    icon: "🔌"
+    questions:
+      - question: "Will this cable work with my device?"
+        answer: "Please check the connector types and specifications. If you're unsure, tell us your device model and we'll help you find the right cable."
+        keywords: ["compatible", "compatibility", "work with", "fit"]
+        priority: high
+      
+      - question: "What's the difference between HDMI versions?"
+        answer: "HDMI 1.4 supports up to 4K@30Hz, HDMI 2.0 supports 4K@60Hz, and HDMI 2.1 supports 4K@120Hz and 8K@60Hz. Choose based on your display needs."
+        keywords: ["hdmi version", "hdmi 1.4", "hdmi 2.0", "hdmi 2.1", "difference"]
+        priority: medium
+      
+      - question: "What Ethernet cable do I need?"
+        answer: "Cat5e is fine for up to 1Gbps, Cat6 for up to 10Gbps at shorter distances, Cat6a/7/8 for longer 10Gbps runs. For home use, Cat6 is usually perfect."
+        keywords: ["ethernet", "cat5e", "cat6", "cat7", "cat8", "network cable"]
+        priority: medium
+  
+  - name: "Technical Support"
+    icon: "🛠️"
+    questions:
+      - question: "My cable isn't working, what should I do?"
+        answer: "First, check both ends are firmly connected. Try a different port or device. If still not working, contact us with your order number for a replacement."
+        keywords: ["not working", "broken", "defective", "problem", "issue"]
+        priority: high
+      
+      - question: "How do I know what cable I need?"
+        answer: "Tell us what you're trying to connect (e.g., 'laptop to monitor', 'PC power supply to GPU') and we'll recommend the right cable."
+        keywords: ["what cable", "which cable", "need help", "don't know"]
+        priority: high
+      
+      - question: "Do you offer cable management solutions?"
+        answer: "Yes! We have cable sleeves, cable combs, velcro ties, and other management accessories to keep your setup clean."
+        keywords: ["cable management", "organize", "tidy", "sleeves"]
+        priority: low
+  
+  - name: "Products We Don't Sell"
+    icon: "❌"
+    questions:
+      - question: "Do you sell GPUs or graphics cards?"
+        answer: "No, we only sell cables and cable-related accessories. We don't carry GPUs, graphics cards, or other computer components."
+        keywords: ["gpu", "graphics card", "video card", "rtx", "nvidia"]
+        priority: high
+      
+      - question: "Do you sell monitors or displays?"
+        answer: "No, we specialize in cables only. We can help you find the right cable for your monitor though!"
+        keywords: ["monitor", "display", "screen", "tv"]
+        priority: medium
+      
+      - question: "Do you sell gaming consoles or games?"
+        answer: "No, we only sell cables. However, we have all the cables you need for your gaming setup!"
+        keywords: ["console", "playstation", "xbox", "nintendo", "games"]
+        priority: medium
+
+# Quick Responses for Common Scenarios
+quick_responses:
+  greeting:
+    - "Hello! I'm here to help you find the perfect cable. What are you looking for?"
+    - "Hi! Looking for a cable? Tell me what you need to connect."
+  
+  unclear_request:
+    - "I'd love to help! Could you tell me more about what you're trying to connect?"
+    - "To find the best cable for you, could you share more details about your setup?"
+  
+  out_of_scope:
+    - "I apologize, but we only sell cables and cable-related accessories. We don't carry that item."
+    - "That's outside our product range. We specialize in cables only. Is there a cable I can help you with?"
+  
+  no_results:
+    - "I couldn't find an exact match. Could you describe what you need in different words?"
+    - "No exact matches found. Let me know more details and I'll find alternatives."

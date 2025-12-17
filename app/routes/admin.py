@@ -8,13 +8,21 @@ import time
 from datetime import datetime
 
 from ..services.session import r as redis_client, get_client_ip, rate_limit
+from ..config import get_config
+from ..utils.logging import get_logger
+
+# ------------------------------------------------------------------ #
+# Config
+# ------------------------------------------------------------------ #
+config = get_config()
+logger = get_logger(__name__)
 
 router = APIRouter()
 
 # ------------------------------------------------------------------ #
 # Admin Auth (simple API key for now – replace with JWT later)
 # ------------------------------------------------------------------ #
-ADMIN_API_KEY = "admin-secret-key-change-in-prod"
+ADMIN_API_KEY = config.security.admin_api_key
 
 def verify_admin(request: Request):
     api_key = request.headers.get("x-admin-key")

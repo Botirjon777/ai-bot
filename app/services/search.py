@@ -1,15 +1,23 @@
 from opensearchpy import OpenSearch
 from typing import List, Dict
-import os
+
+from ..config import get_config
+from ..utils.logging import get_logger
+
+# ------------------------------------------------------------------ #
+# Config
+# ------------------------------------------------------------------ #
+config = get_config()
+logger = get_logger(__name__)
 
 # ------------------------------------------------------------------ #
 # OpenSearch client
 # ------------------------------------------------------------------ #
 opensearch_client = OpenSearch(
-    hosts=[{"host": "localhost", "port": 9200}],
-    http_auth=("admin", "Str0ngP@ssw0rd1245!"),
-    use_ssl=True,
-    verify_certs=False,
+    hosts=[{"host": config.opensearch.host, "port": config.opensearch.port}],
+    http_auth=(config.opensearch.user, config.opensearch.password),
+    use_ssl=config.opensearch.use_ssl,
+    verify_certs=config.opensearch.verify_certs,
     ssl_show_warn=False,
 )
 
@@ -34,7 +42,7 @@ def search_products(query: str, limit: int = 5) -> List[Dict]:
 
     try:
         resp = opensearch_client.search(
-            index="products-index",
+            index=config.opensearch.index_name,
             body={
                 "query": {
                     "bool": {
@@ -64,5 +72,5 @@ def search_products(query: str, limit: int = 5) -> List[Dict]:
                 })
         return products[:limit]
     except Exception as e:
-        print(f"OpenSearch error: {e}")
+        logger.error(f"OpenSearch error: {e}")
         return []

@@ -5,18 +5,19 @@ import hmac
 import hashlib
 from fastapi import Request, Depends, HTTPException
 import redis
-import os
-from datetime import datetime  # ← ADD THIS
+from datetime import datetime
+
+from ..config import get_config
+from ..utils.logging import get_logger
 
 # ------------------------------------------------------------------ #
 # Config
 # ------------------------------------------------------------------ #
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
-SESSION_SECRET = os.getenv(
-    "SESSION_SECRET", "change-me-to-32-bytes-secret-key-here"
-).encode()
+config = get_config()
+logger = get_logger(__name__)
 
-r = redis.from_url(REDIS_URL)
+r = redis.from_url(config.redis.url)
+SESSION_SECRET = config.security.session_secret.encode()
 
 # ------------------------------------------------------------------ #
 # Helpers

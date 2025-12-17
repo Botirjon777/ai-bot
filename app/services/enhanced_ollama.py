@@ -2,12 +2,19 @@
 import requests
 import json
 from typing import List, Dict, Optional, Tuple
-import os
 from datetime import datetime
 from ..services.session import r as redis_client
+from ..config import get_config
+from ..utils.logging import get_logger
 
-OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:3.8b")
+# ------------------------------------------------------------------ #
+# Config
+# ------------------------------------------------------------------ #
+config = get_config()
+logger = get_logger(__name__)
+
+OLLAMA_API_URL = config.ollama.api_url
+OLLAMA_MODEL = config.ollama.model
 
 # ------------------------------------------------------------------ #
 # User Intent Analysis
@@ -242,61 +249,28 @@ def build_enhanced_prompt(
     questions: List[str],
     promotions: List[Dict]
 ) -> str:
-    """Build context-aware prompt with learning"""
+    """Build clear, strict prompt to prevent hallucinations"""
     
-    system_prompt = """You are an intelligent AI assistant for a cable e-commerce store.
-
-PERSONALITY:
-- Helpful and efficient
-- Adapts to customer mood (if they seem impatient, be direct)
-- Professional but friendly
-
-CORE RULES:
-1. ONLY discuss cable-related products
-2. If customer seems impatient/frustrated, show products immediately without extra questions
-3. If specifications are unclear, ask 1-2 clarifying questions (unless customer is impatient)
-4. Always mention promotions when available
-5. Be concise (2-4 sentences max)
-
-MOOD INDICATORS:
-"""
+    prompt = ""
     
-    if mood["is_impatient"]:
-        system_prompt += "- Customer seems IMPATIENT - show products directly, minimal questions\n"
-    elif mood["turn_count"] > 2:
-        system_prompt += "- Long conversation - prioritize showing results\n"
-    else:
-        system_prompt += "- Customer is engaged - can ask clarifying questions if needed\n"
-    
-    if specs:
-        system_prompt += f"\nDETECTED SPECIFICATIONS: {json.dumps(specs)}\n"
-    
-    if questions and not mood["is_impatient"]:
-        system_prompt += f"\nSUGGESTED QUESTIONS: {json.dumps(questions)}\n"
-        system_prompt += "You may ask these questions if specifications are unclear.\n"
-    
+    # List products with exact titles
     if products:
-        system_prompt += "\n\nAVAILABLE PRODUCTS:\n"
+        prompt += "Available products (use these exact titles):\n"
         for i, p in enumerate(products[:5], 1):
-            promo = ""
-            if any(pr["product_id"] == p["id"] for pr in promotions):
-                promo_item = next(pr for pr in promotions if pr["product_id"] == p["id"])
-                promo = f" 🔥 ON SALE: {promo_item['discount']}% OFF!"
-            system_prompt += f"{i}. {p['title']} - ${p['price']} by {p['vendor']}{promo}\n"
+            promo_text = ""
+            if any(pr.get("product_id") == p["id"] for pr in promotions):
+                promo_item = next(pr for pr in promotions if pr.get("product_id") == p["id"])
+                promo_text = f" (Sale: {promo_item.get('discount', 0)}% off)"
+            prompt += f'{i}. "{p["title"]}" - ${p["price"]:.2f}{promo_text}\n'
+        prompt += "\n"
+    else:
+        prompt += "No matching products found.\n\n"
     
-    if promotions and not products:
-        system_prompt += "\n\nCURRENT PROMOTIONS:\n"
-        for promo in promotions[:3]:
-            system_prompt += f"- {promo['title']}: {promo['discount']}% off\n"
+    # Customer question
+    prompt += f"Customer: {messages[-1]['content']}\n\n"
+    prompt += "Respond in 1-2 sentences. Recommend products using their exact titles from the list above."
     
-    # Add conversation history
-    conversation = system_prompt + "\n\nCONVERSATION:\n"
-    for msg in messages[-8:]:
-        role = "Customer" if msg["role"] == "user" else "Assistant"
-        conversation += f"{role}: {msg['content']}\n"
-    
-    conversation += "Assistant:"
-    return conversation
+    return prompt
 
 
 # ------------------------------------------------------------------ #
@@ -375,3 +349,121 @@ async def stream_enhanced_ollama_response(
     except Exception as e:
         print(f"Enhanced Ollama error: {e}")
         yield f"data: {json.dumps({'token': 'Sorry, I am having trouble right now.', 'done': True, 'error': True})}\n\n"
+
+
+# ------------------------------------------------------------------ #
+# Non-Streaming Function (Complete Response)
+# ------------------------------------------------------------------ #
+def get_enhanced_ollama_response(
+    messages: List[Dict],
+    products: List[Dict],
+    session_id: str
+) -> str:
+    """Enhanced non-streaming response - returns complete answer at once"""
+    
+    current_message = messages[-1]["content"]
+    
+    # Analyze user intent and mood
+    mood = IntentAnalyzer.analyze_mood(current_message, messages[:-1])
+    specs = IntentAnalyzer.extract_specifications(current_message)
+    cable_type = specs.get("cable_type")
+    
+    # Get learned patterns
+    learned_patterns = LearningSystem.get_learned_patterns(current_message)
+    
+    # Generate questions if appropriate
+    questions = []
+    if QuestionGenerator.should_ask_questions(mood, specs, cable_type):
+        questions = QuestionGenerator.generate_questions(specs, cable_type, learned_patterns)
+    
+    # Get promotions
+    promotions = []  # TODO: get_active_promotions()
+    
+    # Build prompt
+    prompt = build_enhanced_prompt(messages, products, mood, specs, questions, promotions)
+    
+    # Log for learning
+    if questions:
+        LearningSystem.log_clarification_needed(current_message, list(specs.keys()))
+    
+    # Get complete response from Ollama (non-streaming)
+    try:
+        # Build system message (rules)
+        system_message = """You are a helpful cable store assistant.
+- Recommend products from the list provided
+- Use exact product titles from the list
+- Keep responses brief (1-2 sentences)
+- Do not invent product names"""
+        
+        # Build user message with product list
+        user_message = prompt
+        
+        # Use chat API instead of generate for better instruction following
+        response = requests.post(
+            f"{OLLAMA_API_URL}/api/chat",
+            json={
+                "model": OLLAMA_MODEL,
+                "messages": [
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": user_message}
+                ],
+                "stream": False,
+                "options": {
+                    "temperature": 0.3,  # Low but not too low - for natural responses
+                    "top_p": 0.5,
+                    "top_k": 10,
+                    "num_predict": 150,
+                    "repeat_penalty": 1.2,  # Moderate penalty to avoid garbled text
+                },
+            },
+            timeout=config.ollama.timeout,
+        )
+        
+        if response.status_code != 200:
+            logger.error(f"Ollama error {response.status_code}: {response.text}")
+            return "Sorry, I am having trouble right now. Please try again."
+        
+        data = response.json()
+        assistant_response = data.get("message", {}).get("content", "")
+        
+        if not assistant_response:
+            # Fallback: Simple template without AI
+            if products:
+                product_list = []
+                for p in products[:3]:
+                    promo = ""
+                    if any(pr.get("product_id") == p["id"] for pr in promotions):
+                        promo_item = next(pr for pr in promotions if pr.get("product_id") == p["id"])
+                        promo = f" (Sale: {promo_item.get('discount', 0)}% off)"
+                    product_list.append(f'{p["title"]} (${p["price"]:.2f}{promo})')
+                
+                return f"We have these options: {', '.join(product_list)}."
+            else:
+                return "I don't have exact matches for that. Could you provide more details?"
+        
+        # Check if response looks garbled or has hallucinations
+        response_lower = assistant_response.lower()
+        if any(indicator in response_lower for indicator in ['$35.08', '$29', '$5.78', 'package deal', '✅', '🔧']):
+            # AI is hallucinating - use simple template instead
+            if products:
+                product_list = []
+                for p in products[:3]:
+                    promo = ""
+                    if any(pr.get("product_id") == p["id"] for pr in promotions):
+                        promo_item = next(pr for pr in promotions if pr.get("product_id") == p["id"])
+                        promo = f" (Sale: {promo_item.get('discount', 0)}% off)"
+                    product_list.append(f'{p["title"]} (${p["price"]:.2f}{promo})')
+                
+                return f"We have these options: {', '.join(product_list)}."
+            else:
+                return "I don't have exact matches for that. Could you provide more details?"
+            
+        return assistant_response.strip()
+    
+    except requests.exceptions.Timeout:
+        logger.error("Ollama request timeout")
+        return "Sorry, the request took too long. Please try again."
+    
+    except Exception as e:
+        logger.error(f"Enhanced Ollama error: {e}")
+        return "Sorry, I am having trouble right now. Please try again."

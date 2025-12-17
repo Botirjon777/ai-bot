@@ -1,33 +1,39 @@
 from fastapi import APIRouter, Request
 from datetime import datetime
 import requests
-import os
-import redis
 
 from ..services.session import r as redis_client
+from ..config import get_config
+from ..knowledge import FAQSystem
+from ..utils.logging import get_logger
+
+# ------------------------------------------------------------------ #
+# Config
+# ------------------------------------------------------------------ #
+config = get_config()
+logger = get_logger(__name__)
+faq_system = FAQSystem()
 
 router = APIRouter()
-
-OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:3.8b")
 
 # ------------------------------------------------------------------ #
 @router.get("/faq")
 async def faq():
-    return {
-        "faqs": [
-            {"question": "What cable lengths do you offer?",
-             "answer": "0.5m to 5m depending on the type."},
-            {"question": "Do you make custom cables?",
-             "answer": "Yes, with your preferred colors and connectors."},
-            {"question": "What's your return policy?",
-             "answer": "30-day returns for unused products."},
-            {"question": "Do you ship internationally?",
-             "answer": "Yes, we ship worldwide with tracking."},
-            {"question": "Do you sell GPUs?",
-             "answer": "No, we only sell cables and accessories."},
-        ]
-    }
+    """Get all FAQs organized by category."""
+    categories = faq_system.get_all_categories()
+    
+    # Get all FAQs
+    all_faqs = []
+    for category in categories:
+        faqs = faq_system.get_by_category(category["name"])
+        for faq_item in faqs:
+            all_faqs.append({
+                "category": category["name"],
+                "question": faq_item["question"],
+                "answer": faq_item["answer"]
+            })
+    
+    return {"faqs": all_faqs, "categories": categories}
 
 
 @router.delete("/session/{session_id}")
@@ -39,15 +45,38 @@ async def clear_session(session_id: str):
 
 @router.get("/health")
 async def health():
+    """Comprehensive health check for all services."""
+    # Check Ollama
     try:
-        resp = requests.get(f"{OLLAMA_API_URL}/api/tags", timeout=2)
+        resp = requests.get(f"{config.ollama.api_url}/api/tags", timeout=2)
         ollama_status = "connected" if resp.status_code == 200 else "disconnected"
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Ollama health check failed: {e}")
         ollama_status = "disconnected"
+    
+    # Check Redis
+    try:
+        redis_client.ping()
+        redis_status = "connected"
+    except Exception as e:
+        logger.warning(f"Redis health check failed: {e}")
+        redis_status = "disconnected"
+    
+    # Check OpenSearch
+    try:
+        from ..services.search import opensearch_client
+        opensearch_client.cluster.health()
+        opensearch_status = "connected"
+    except Exception as e:
+        logger.warning(f"OpenSearch health check failed: {e}")
+        opensearch_status = "disconnected"
 
     return {
         "status": "ok",
         "ollama": ollama_status,
-        "model": OLLAMA_MODEL,
+        "redis": redis_status,
+        "opensearch": opensearch_status,
+        "model": config.ollama.model,
+        "environment": config.env,
         "timestamp": datetime.now().isoformat(),
     }

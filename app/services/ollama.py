@@ -1,10 +1,18 @@
 import requests
 import json
 from typing import List, Dict
-import os
 
-OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:3.8b")
+from ..config import get_config
+from ..utils.logging import get_logger
+
+# ------------------------------------------------------------------ #
+# Config
+# ------------------------------------------------------------------ #
+config = get_config()
+logger = get_logger(__name__)
+
+OLLAMA_API_URL = config.ollama.api_url
+OLLAMA_MODEL = config.ollama.model
 
 # ------------------------------------------------------------------ #
 # Prompt builder

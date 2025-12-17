@@ -1,19 +1,26 @@
 # app/services/enhanced_search.py
 from opensearchpy import OpenSearch
 from typing import List, Dict, Optional
-import os
 from datetime import datetime
 from ..services.session import r as redis_client
+from ..config import get_config
+from ..utils.logging import get_logger
 import json
+
+# ------------------------------------------------------------------ #
+# Config
+# ------------------------------------------------------------------ #
+config = get_config()
+logger = get_logger(__name__)
 
 # ------------------------------------------------------------------ #
 # OpenSearch client
 # ------------------------------------------------------------------ #
 opensearch_client = OpenSearch(
-    hosts=[{"host": "localhost", "port": 9200}],
-    http_auth=("admin", "Str0ngP@ssw0rd1245!"),
-    use_ssl=True,
-    verify_certs=False,
+    hosts=[{"host": config.opensearch.host, "port": config.opensearch.port}],
+    http_auth=(config.opensearch.user, config.opensearch.password),
+    use_ssl=config.opensearch.use_ssl,
+    verify_certs=config.opensearch.verify_certs,
     ssl_show_warn=False,
 )
 

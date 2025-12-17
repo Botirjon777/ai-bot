@@ -1,11 +1,9 @@
-# app/routes/chat.py (UPDATED)
+# app/routes/chat.py (UPDATED - Non-Streaming)
 from fastapi import APIRouter, Request, Depends, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
-from typing import Optional, List, Dict
-import json
-import asyncio
+from fastapi.responses import JSONResponse
+from typing import List, Dict
 
+from ..models.chat import ChatRequest, HumanRequest, ProductClickRequest
 from ..services.session import (
     get_session, create_session_id, sign_session,
     get_client_ip, rate_limit, r as redis_client,
@@ -13,38 +11,22 @@ from ..services.session import (
 )
 from ..services.enhanced_search import smart_search, ProductFeedback
 from ..services.enhanced_ollama import (
-    stream_enhanced_ollama_response,
+    get_enhanced_ollama_response,
     IntentAnalyzer,
     LearningSystem
 )
 from ..services.search import contains_gpu
-import os
+from ..config import get_config
+from ..utils.logging import get_logger
+from ..utils.validators import validate_message
+
+# ------------------------------------------------------------------ #
+# Config
+# ------------------------------------------------------------------ #
+config = get_config()
+logger = get_logger(__name__)
 
 router = APIRouter()
-
-# ------------------------------------------------------------------ #
-# Models
-# ------------------------------------------------------------------ #
-class ChatRequest(BaseModel):
-    message: str
-    user_info: Optional[dict] = None
-
-class HumanRequest(BaseModel):
-    name: str
-    email: str
-
-class ProductClickRequest(BaseModel):
-    product_id: str
-    query: str
-
-# ------------------------------------------------------------------ #
-# Nonsense detection
-# ------------------------------------------------------------------ #
-def is_nonsense(text: str) -> bool:
-    words = text.lower().split()
-    if len(words) < 2:
-        return True
-    return len(set(words)) / len(words) < 0.3
 
 # ------------------------------------------------------------------ #
 # Routes
@@ -54,7 +36,7 @@ async def init_session(response: JSONResponse):
     sid = create_session_id()
     sig = sign_session(sid)
 
-    is_dev = os.getenv("ENV", "dev") == "dev"
+    is_dev = config.is_development
     secure = not is_dev
     samesite = "lax" if is_dev else "none"
 
@@ -76,8 +58,11 @@ async def chat(
     if not rate_limit(ip):
         raise HTTPException(429, "Too many requests. Wait 1 minute.")
 
-    if is_nonsense(body.message):
-        raise HTTPException(400, "Please send a meaningful message.")
+    # Validate message
+    try:
+        validate_message(body.message)
+    except Exception as e:
+        raise HTTPException(400, str(e))
 
     if contains_gpu(body.message):
         return JSONResponse({
@@ -114,12 +99,21 @@ async def chat(
     promotions = search_results["promotions"]
 
     # ------------------------------------------------------------------ #
-    # Streaming with Enhanced AI
+    # Non-Streaming Response (Complete Answer at Once)
     # ------------------------------------------------------------------ #
-    async def event_generator():
-        full_response = ""
-
-        # 1. Send products with promotion flags
+    try:
+        # Get complete AI response
+        ai_response = get_enhanced_ollama_response(messages, products, session_id)
+        
+        # Persist assistant response
+        redis_client.rpush(key, f"assistant:{ai_response}")
+        redis_client.expire(key, 86400)
+        publish_message(session_id, "assistant", ai_response)
+        
+        # Log search pattern for learning
+        LearningSystem.log_search_pattern(session_id, body.message, specs)
+        
+        # Prepare products for response
         products_to_send = []
         for p in products[:5]:
             product_data = {
@@ -133,82 +127,26 @@ async def chat(
                 product_data["discounted_price"] = p["discounted_price"]
             products_to_send.append(product_data)
         
-        yield f"data: {json.dumps({'type': 'products', 'products': products_to_send})}\n\n"
-
-        # 2. Send promotions banner if available
-        if search_results["has_promotions"]:
-            yield f"data: {json.dumps({'type': 'promotions', 'message': '🔥 Special deals available!'})}\n\n"
-
-        # 3. Set up Redis pub/sub for admin messages
-        pubsub = redis_client.pubsub()
-        channel = f"session:{session_id}"
-        pubsub.subscribe(channel)
-
-        # 4. Stream enhanced AI response
-        try:
-            ollama_gen = stream_enhanced_ollama_response(messages, products, session_id)
-            ollama_iter = ollama_gen.__aiter__()
-
-            while True:
-                # Check for admin messages
-                msg = pubsub.get_message(ignore_subscribe_messages=True, timeout=0.1)
-                if msg and msg["type"] == "message":
-                    try:
-                        data = json.loads(msg["data"])
-                        if data.get("role") == "admin":
-                            yield f"data: {json.dumps({'type': 'admin_message', 'content': data['content']})}\n\n"
-                    except Exception as e:
-                        print(f"PubSub error: {e}")
-
-                # Get next Ollama chunk
-                try:
-                    chunk = await asyncio.wait_for(ollama_iter.__anext__(), timeout=0.1)
-                    yield chunk
-                    if chunk.startswith("data: "):
-                        try:
-                            data = json.loads(chunk[6:])
-                            if data.get("token"):
-                                full_response += data["token"]
-                        except:
-                            pass
-                except StopAsyncIteration:
-                    break
-                except asyncio.TimeoutError:
-                    pass
-                except Exception as e:
-                    print(f"Ollama chunk error: {e}")
-                    break
-
-                await asyncio.sleep(0.05)
-
-        except Exception as e:
-            print(f"Stream error: {e}")
-            yield f"data: {json.dumps({'token': 'Stream error.', 'done': True, 'error': True})}\n\n"
-        finally:
-            pubsub.unsubscribe(channel)
-            try:
-                await ollama_gen.aclose()
-            except:
-                pass
-
-        # 5. Persist assistant response and log for learning
-        if full_response.strip():
-            redis_client.rpush(key, f"assistant:{full_response}")
-            redis_client.expire(key, 86400)
-            publish_message(session_id, "assistant", full_response)
-            
-            # Log search pattern for learning
-            LearningSystem.log_search_pattern(session_id, body.message, specs)
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
+        # Return complete JSON response
+        return JSONResponse({
+            "response": ai_response,
+            "session_id": session_id,
+            "suggested_products": products_to_send if products_to_send else None,
+            "has_promotions": search_results["has_promotions"]
+        })
+    
+    except Exception as e:
+        logger.error(f"Chat error: {e}")
+        return JSONResponse(
+            {
+                "response": "Sorry, I am having trouble right now. Please try again.",
+                "session_id": session_id,
+                "suggested_products": None,
+                "has_promotions": False,
+                "error": True
+            },
+            status_code=500
+        )
 
 
 @router.post("/product-click")
