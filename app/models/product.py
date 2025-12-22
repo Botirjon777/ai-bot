@@ -14,6 +14,7 @@ class Product(BaseModel):
     price: float = Field(..., gt=0)
     vendor: str
     sellable: bool = True
+    slug: Optional[str] = None
     stock_quantity: Optional[int] = None
     description: Optional[str] = None
     category: Optional[str] = None

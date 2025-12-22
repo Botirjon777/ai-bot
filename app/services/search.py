@@ -62,13 +62,17 @@ def search_products(query: str, limit: int = 5) -> List[Dict]:
             src = hit["_source"]
             title = src.get("title", "")
             vendor = src.get("vendor", "")
-            if not contains_gpu(f"{title} {vendor}"):
+            sellable = src.get("sellable", False)
+            
+            # Only include sellable products and exclude GPU-related items
+            if sellable and not contains_gpu(f"{title} {vendor}"):
                 products.append({
                     "id": src.get("id"),
                     "title": title,
                     "price": src.get("price"),
                     "vendor": vendor,
-                    "sellable": src.get("sellable"),
+                    "sellable": sellable,
+                    "slug": src.get("slug"),
                 })
         return products[:limit]
     except Exception as e:

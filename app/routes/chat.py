@@ -120,7 +120,9 @@ async def chat(
                 "id": p["id"],
                 "title": p["title"],
                 "price": p["price"],
-                "vendor": p["vendor"]
+                "vendor": p["vendor"],
+                "slug": p.get("slug"),
+                "sellable": p.get("sellable", True)
             }
             if "promotion" in p:
                 product_data["promotion"] = p["promotion"]

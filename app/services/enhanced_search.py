@@ -165,14 +165,17 @@ def enhanced_search_products(
             src = hit["_source"]
             title = src.get("title", "")
             vendor = src.get("vendor", "")
+            sellable = src.get("sellable", False)
             
-            if not contains_gpu(f"{title} {vendor}"):
+            # Only include sellable products and exclude GPU-related items
+            if sellable and not contains_gpu(f"{title} {vendor}"):
                 product = {
                     "id": src.get("id"),
                     "title": title,
                     "price": src.get("price"),
                     "vendor": vendor,
-                    "sellable": src.get("sellable"),
+                    "sellable": sellable,
+                    "slug": src.get("slug"),
                     "score": hit["_score"]
                 }
                 
