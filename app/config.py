@@ -86,7 +86,10 @@ class AppConfig(BaseSettings):
     debug: bool = True
     
     # CORS
-    cors_origins: list[str] = ["*"]  # Allow all origins for development
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "https://parabolically-indented-dia.ngrok-free.dev"
+    ]
     
     # API
     api_prefix: str = "/api"
