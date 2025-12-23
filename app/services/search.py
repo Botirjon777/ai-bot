@@ -15,7 +15,6 @@ logger = get_logger(__name__)
 # ------------------------------------------------------------------ #
 opensearch_client = OpenSearch(
     hosts=[{"host": config.opensearch.host, "port": config.opensearch.port}],
-    http_auth=(config.opensearch.user, config.opensearch.password),
     use_ssl=config.opensearch.use_ssl,
     verify_certs=config.opensearch.verify_certs,
     ssl_show_warn=False,
