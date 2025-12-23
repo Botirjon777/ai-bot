@@ -16,7 +16,7 @@ class OpenSearchConfig(BaseSettings):
     port: int = 9200
     user: str = "admin"
     password: str = "Str0ngP@ssw0rd1245!"
-    use_ssl: bool = True
+    use_ssl: bool = False
     verify_certs: bool = False
     index_name: str = "products-index"
     
