@@ -109,38 +109,36 @@ def get_enhanced_ollama_response(
     session_id: str
 ) -> str:
     """
-    Get AI response with product context
+    Get AI response with product context (optimized for speed)
     """
     
-    # Build system prompt with product context
-    system_prompt = """You are a helpful AI assistant for a cable and computer accessories store.
+    # Build concise system prompt with product context
+    system_prompt = """You are a helpful AI assistant for a cable store.
 
-Your role:
-- Help customers find the right cables and accessories
-- Provide clear, concise product recommendations
-- Be friendly and professional
+Rules:
+- Help customers find cables and accessories
+- Keep responses under 2-3 sentences
 - Only recommend products from our catalog
+- We do NOT sell GPUs or computer components
 
-IMPORTANT RULES:
-- We ONLY sell cables and cable-related accessories
-- We do NOT sell GPUs, graphics cards, or computer components
-- If asked about GPUs or non-cable products, politely decline and redirect to cables
-- Keep responses under 3 sentences when possible
-- Always be helpful and friendly"""
+Be friendly, concise, and helpful."""
 
     if products:
         product_list = "\n".join([
-            f"- {p['title']} (${p['price']:.2f}) by {p['vendor']}"
+            f"- {p['title']} (${p['price']:.2f})"
             for p in products[:5]
         ])
-        system_prompt += f"\n\nAvailable products matching the query:\n{product_list}"
+        system_prompt += f"\n\nAvailable products:\n{product_list}"
     
     # Prepare messages for Ollama
     ollama_messages = [{"role": "system", "content": system_prompt}]
     ollama_messages.extend(messages)
     
-    # Call Ollama API
+    # Call Ollama API with optimized parameters
     try:
+        import time
+        start_time = time.time()
+        
         response = requests.post(
             f"{config.ollama.api_url}/api/chat",
             json={
@@ -152,18 +150,28 @@ IMPORTANT RULES:
                     "top_p": config.ollama.top_p,
                     "top_k": config.ollama.top_k,
                     "num_predict": config.ollama.max_tokens,
+                    "num_ctx": config.ollama.num_ctx,
+                    "repeat_penalty": config.ollama.repeat_penalty,
+                    "num_gpu": 1,  # Use GPU if available
                 }
             },
             timeout=config.ollama.timeout
         )
         
+        elapsed = time.time() - start_time
+        
         if response.status_code == 200:
             result = response.json()
-            return result["message"]["content"]
+            ai_response = result["message"]["content"]
+            logger.info(f"Ollama response time: {elapsed:.2f}s for {len(ai_response)} chars")
+            return ai_response
         else:
             logger.error(f"Ollama API error: {response.status_code}")
             return "I'm having trouble processing your request. Please try again."
             
+    except requests.Timeout:
+        logger.error(f"Ollama request timeout after {config.ollama.timeout}s")
+        return "I'm taking too long to respond. Please try a simpler question."
     except Exception as e:
         logger.error(f"Ollama request failed: {e}")
         return "I'm having trouble connecting to my AI service. Please try again in a moment."

@@ -39,12 +39,14 @@ class OllamaConfig(BaseSettings):
     """Ollama AI service configuration."""
     
     api_url: str = "http://localhost:11434"
-    model: str = "llama3:8b"
-    timeout: int = 60
-    temperature: float = 0.7
+    model: str = "qwen2.5:3b"  # Faster model for quick responses
+    timeout: int = 30  # Reduced timeout for faster failures
+    temperature: float = 0.5  # Lower temperature for more focused, faster responses
     top_p: float = 0.9
     top_k: int = 40
-    max_tokens: int = 250
+    max_tokens: int = 150  # Reduced for shorter, faster responses
+    num_ctx: int = 2048  # Limit context window for faster processing
+    repeat_penalty: float = 1.1  # Prevent repetitive text
     
     class Config:
         env_prefix = "OLLAMA_"
