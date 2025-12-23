@@ -86,7 +86,7 @@ class AppConfig(BaseSettings):
     debug: bool = True
     
     # CORS
-    cors_origins: list[str] = ["http://localhost:3000", "https://yourdomain.com"]
+    cors_origins: list[str] = ["*"]  # Allow all origins for development
     
     # API
     api_prefix: str = "/api"
