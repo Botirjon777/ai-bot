@@ -14,11 +14,9 @@ class OpenSearchConfig(BaseSettings):
     
     host: str = "localhost"
     port: int = 9200
-    user: str = "admin"
-    password: str = "Str0ngP@ssw0rd1245!"
     use_ssl: bool = False
     verify_certs: bool = False
-    index_name: str = "products-index"
+    index_name: str = "new-products-index"
     
     class Config:
         env_prefix = "OPENSEARCH_"

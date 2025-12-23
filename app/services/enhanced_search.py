@@ -107,7 +107,7 @@ def enhanced_search_products(
     
     try:
         resp = opensearch_client.search(
-            index="products-index",
+            index=config.opensearch.index_name,
             body={
                 "query": {
                     "bool": {
