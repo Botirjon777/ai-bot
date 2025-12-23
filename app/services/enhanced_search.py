@@ -2,7 +2,6 @@
 from opensearchpy import OpenSearch
 from typing import List, Dict, Optional
 from datetime import datetime
-from ..services.session import r as redis_client
 from ..config import get_config
 from ..utils.logging import get_logger
 import json
@@ -34,54 +33,25 @@ def contains_gpu(text: str) -> bool:
 
 
 # ------------------------------------------------------------------ #
-# Promotion Management
+# Promotion Management (DISABLED - requires Redis)
 # ------------------------------------------------------------------ #
 class PromotionManager:
-    """Manages active promotions and discounts"""
+    """Manages active promotions and discounts (DISABLED without Redis)"""
     
     @staticmethod
     def get_active_promotions() -> List[Dict]:
-        """Retrieve all active promotions from Redis"""
-        key = "promotions:active"
-        promos = redis_client.lrange(key, 0, -1)
-        active = []
-        
-        for promo in promos:
-            try:
-                data = json.loads(promo)
-                # Check if promotion is still valid
-                end_date = datetime.fromisoformat(data["end_date"])
-                if end_date > datetime.now():
-                    active.append(data)
-            except Exception as e:
-                print(f"Promotion parse error: {e}")
-                continue
-        
-        return active
+        """Retrieve all active promotions (disabled without Redis)"""
+        return []
     
     @staticmethod
     def add_promotion(product_id: str, title: str, discount: int, end_date: str):
-        """Add a new promotion (admin function)"""
-        promo = {
-            "product_id": product_id,
-            "title": title,
-            "discount": discount,
-            "end_date": end_date,
-            "created_at": datetime.now().isoformat()
-        }
-        
-        key = "promotions:active"
-        redis_client.lpush(key, json.dumps(promo))
-        redis_client.expire(key, 7776000)  # 90 days
-        return promo
+        """Add a new promotion (disabled without Redis)"""
+        logger.warning("Promotions disabled: Redis not available")
+        return None
     
     @staticmethod
     def is_on_promotion(product_id: str) -> Optional[Dict]:
-        """Check if a specific product is on promotion"""
-        promotions = PromotionManager.get_active_promotions()
-        for promo in promotions:
-            if promo["product_id"] == product_id:
-                return promo
+        """Check if a specific product is on promotion (disabled without Redis)"""
         return None
 
 
@@ -94,7 +64,7 @@ def enhanced_search_products(
     limit: int = 10
 ) -> tuple[List[Dict], List[Dict]]:
     """
-    Enhanced search with specification filtering and promotion detection
+    Enhanced search with specification filtering
     Returns: (products, promotions)
     """
     
@@ -157,9 +127,6 @@ def enhanced_search_products(
         
         hits = resp["hits"]["hits"]
         products = []
-        promoted_products = []
-        
-        promotions = PromotionManager.get_active_promotions()
         
         for hit in hits:
             src = hit["_source"]
@@ -178,78 +145,36 @@ def enhanced_search_products(
                     "slug": src.get("slug"),
                     "score": hit["_score"]
                 }
-                
-                # Check if on promotion
-                promo = PromotionManager.is_on_promotion(product["id"])
-                if promo:
-                    product["promotion"] = promo
-                    product["discounted_price"] = product["price"] * (1 - promo["discount"] / 100)
-                    promoted_products.append(product)
-                else:
-                    products.append(product)
+                products.append(product)
         
-        # Prioritize promoted products
-        final_products = (promoted_products + products)[:limit]
-        
-        return final_products, promotions
+        # Return products (promotions disabled)
+        return products[:limit], []
     
     except Exception as e:
-        print(f"OpenSearch error: {e}")
+        logger.error(f"OpenSearch error: {e}")
         return [], []
 
 
 # ------------------------------------------------------------------ #
-# Product Feedback for Learning
+# Product Feedback for Learning (DISABLED - requires Redis)
 # ------------------------------------------------------------------ #
 class ProductFeedback:
-    """Track product selections for learning"""
+    """Track product selections for learning (DISABLED without Redis)"""
     
     @staticmethod
     def log_product_view(session_id: str, product_id: str, query: str):
-        """Log when a user views a product"""
-        key = f"feedback:view:{product_id}"
-        data = {
-            "session_id": session_id,
-            "query": query,
-            "timestamp": datetime.now().isoformat()
-        }
-        redis_client.lpush(key, json.dumps(data))
-        redis_client.ltrim(key, 0, 99)
-        redis_client.expire(key, 2592000)  # 30 days
+        """Log when a user views a product (disabled without Redis)"""
+        pass
     
     @staticmethod
     def log_product_click(session_id: str, product_id: str, query: str):
-        """Log when a user clicks/selects a product"""
-        key = f"feedback:click:{product_id}"
-        data = {
-            "session_id": session_id,
-            "query": query,
-            "timestamp": datetime.now().isoformat()
-        }
-        redis_client.lpush(key, json.dumps(data))
-        redis_client.ltrim(key, 0, 99)
-        redis_client.expire(key, 2592000)
-        
-        # Update product popularity score
-        popularity_key = f"product:popularity:{product_id}"
-        redis_client.incr(popularity_key)
-        redis_client.expire(popularity_key, 2592000)
+        """Log when a user clicks/selects a product (disabled without Redis)"""
+        pass
     
     @staticmethod
     def get_popular_products(cable_type: Optional[str] = None, limit: int = 5) -> List[str]:
-        """Get most popular product IDs"""
-        pattern = "product:popularity:*"
-        keys = redis_client.keys(pattern)
-        
-        products_with_scores = []
-        for key in keys:
-            product_id = key.decode().split(":")[-1]
-            score = int(redis_client.get(key) or 0)
-            products_with_scores.append((product_id, score))
-        
-        # Sort by score
-        products_with_scores.sort(key=lambda x: x[1], reverse=True)
-        return [pid for pid, _ in products_with_scores[:limit]]
+        """Get most popular product IDs (disabled without Redis)"""
+        return []
 
 
 # ------------------------------------------------------------------ #
@@ -262,26 +187,15 @@ def smart_search(
     include_popular: bool = True
 ) -> Dict:
     """
-    Orchestrate smart search with learning and recommendations
+    Orchestrate smart search
     """
     
     # Perform enhanced search
     products, promotions = enhanced_search_products(query, specs, limit=10)
     
-    # Get popular products if results are limited
-    if len(products) < 5 and include_popular:
-        cable_type = specs.get("cable_type")
-        popular_ids = ProductFeedback.get_popular_products(cable_type, limit=3)
-        # You'd fetch these products from OpenSearch by ID
-        # For now, we'll just note that we should show popular items
-    
-    # Log views for learning
-    for product in products[:5]:
-        ProductFeedback.log_product_view(session_id, product["id"], query)
-    
     return {
         "products": products,
         "promotions": promotions,
-        "has_promotions": len([p for p in products if "promotion" in p]) > 0,
+        "has_promotions": False,
         "total_results": len(products)
     }

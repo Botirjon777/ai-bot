@@ -41,7 +41,7 @@ class OllamaConfig(BaseSettings):
     """Ollama AI service configuration."""
     
     api_url: str = "http://localhost:11434"
-    model: str = "phi3:3.8b"
+    model: str = "llama3:8b"
     timeout: int = 60
     temperature: float = 0.7
     top_p: float = 0.9

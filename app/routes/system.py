@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from datetime import datetime
 import requests
 
-from ..services.session import r as redis_client
+from ..services.session import clear_session as clear_session_storage
 from ..config import get_config
 from ..knowledge import FAQSystem
 from ..utils.logging import get_logger
@@ -54,13 +54,8 @@ async def health():
         logger.warning(f"Ollama health check failed: {e}")
         ollama_status = "disconnected"
     
-    # Check Redis
-    try:
-        redis_client.ping()
-        redis_status = "connected"
-    except Exception as e:
-        logger.warning(f"Redis health check failed: {e}")
-        redis_status = "disconnected"
+    # Redis is disabled
+    redis_status = "disabled (not in use)"
     
     # Check OpenSearch
     try:

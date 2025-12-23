@@ -6,8 +6,8 @@ from typing import List, Dict
 from ..models.chat import ChatRequest, HumanRequest, ProductClickRequest
 from ..services.session import (
     get_session, create_session_id, sign_session,
-    get_client_ip, rate_limit, r as redis_client,
-    publish_message
+    get_client_ip, rate_limit, publish_message,
+    add_to_session, get_session_history
 )
 from ..services.enhanced_search import smart_search, ProductFeedback
 from ..services.enhanced_ollama import (
@@ -72,12 +72,11 @@ async def chat(
         })
 
     # Load conversation history
-    key = f"session:{session_id}"
-    history = redis_client.lrange(key, 0, -1)
+    history = get_session_history(session_id)
     messages: List[Dict] = []
     for item in history:
         try:
-            role, content = item.decode("utf-8").split(":", 1)
+            role, content = item.split(":", 1)
             messages.append({"role": role, "content": content})
         except:
             continue
@@ -85,8 +84,7 @@ async def chat(
     # Append user message
     user_msg = {"role": "user", "content": body.message}
     messages.append(user_msg)
-    redis_client.rpush(key, f"{user_msg['role']}:{user_msg['content']}")
-    redis_client.expire(key, 86400)
+    add_to_session(session_id, f"{user_msg['role']}:{user_msg['content']}")
 
     # Publish for admin panel
     publish_message(session_id, "user", body.message)
@@ -106,8 +104,7 @@ async def chat(
         ai_response = get_enhanced_ollama_response(messages, products, session_id)
         
         # Persist assistant response
-        redis_client.rpush(key, f"assistant:{ai_response}")
-        redis_client.expire(key, 86400)
+        add_to_session(session_id, f"assistant:{ai_response}")
         publish_message(session_id, "assistant", ai_response)
         
         # Log search pattern for learning
