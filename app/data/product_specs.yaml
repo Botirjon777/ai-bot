@@ -1,0 +1,154 @@
+# Product Specifications and Catalog
+
+# Cable Types and Their Specifications
+cable_types:
+  usb:
+    name: "USB Cables"
+    variants:
+      - usb-a
+      - usb-b
+      - usb-c
+      - micro-usb
+      - mini-usb
+    common_lengths: ["0.5m", "1m", "2m", "3m"]
+    common_colors: ["black", "white", "red", "blue"]
+    typical_use_cases:
+      - "Charging devices"
+      - "Data transfer"
+      - "Connecting peripherals"
+
+  hdmi:
+    name: "HDMI Cables"
+    variants:
+      - hdmi-1.4
+      - hdmi-2.0
+      - hdmi-2.1
+    common_lengths: ["1m", "2m", "3m", "5m", "10m"]
+    common_colors: ["black"]
+    typical_use_cases:
+      - "Connecting monitors"
+      - "TV connections"
+      - "Gaming consoles"
+
+  displayport:
+    name: "DisplayPort Cables"
+    variants:
+      - displayport-1.2
+      - displayport-1.4
+    common_lengths: ["1m", "2m", "3m"]
+    common_colors: ["black"]
+    typical_use_cases:
+      - "High-resolution monitors"
+      - "Multi-monitor setups"
+
+  power:
+    name: "PC Power Cables"
+    variants:
+      - 24pin-atx
+      - 8pin-pcie
+      - 6pin-pcie
+      - 4pin-molex
+      - sata-power
+    common_lengths: ["0.3m", "0.5m", "0.6m", "1m"]
+    common_colors: ["black", "white", "red", "custom-sleeved"]
+    typical_use_cases:
+      - "Motherboard power"
+      - "GPU power"
+      - "Storage devices"
+      - "Custom PC builds"
+
+  ethernet:
+    name: "Ethernet Cables"
+    variants:
+      - cat5e
+      - cat6
+      - cat6a
+      - cat7
+      - cat8
+    common_lengths: ["1m", "2m", "3m", "5m", "10m", "15m", "30m"]
+    common_colors: ["black", "blue", "white", "yellow"]
+    typical_use_cases:
+      - "Network connections"
+      - "Internet connectivity"
+      - "Server connections"
+
+# Connector Types
+connectors:
+  usb:
+    - type: "USB-A"
+      description: "Standard rectangular USB connector"
+    - type: "USB-B"
+      description: "Square connector typically for printers"
+    - type: "USB-C"
+      description: "Reversible modern USB connector"
+    - type: "Micro-USB"
+      description: "Small connector for mobile devices"
+    - type: "Mini-USB"
+      description: "Older small connector format"
+
+  video:
+    - type: "HDMI"
+      description: "High-Definition Multimedia Interface"
+    - type: "DisplayPort"
+      description: "Digital display interface"
+    - type: "DVI"
+      description: "Digital Visual Interface"
+    - type: "VGA"
+      description: "Video Graphics Array (analog)"
+
+  power:
+    - type: "24-pin ATX"
+      description: "Main motherboard power connector"
+    - type: "8-pin PCIe"
+      description: "Graphics card power connector"
+    - type: "6-pin PCIe"
+      description: "Graphics card power connector"
+    - type: "4-pin Molex"
+      description: "Legacy peripheral power connector"
+    - type: "SATA Power"
+      description: "Storage device power connector"
+
+# Common Product Combinations
+common_combinations:
+  - query_pattern: "gaming setup"
+    recommended_products:
+      - "HDMI 2.1 cable"
+      - "DisplayPort cable"
+      - "USB-C cable"
+      - "Ethernet Cat6 cable"
+
+  - query_pattern: "custom pc build"
+    recommended_products:
+      - "24-pin ATX cable"
+      - "8-pin PCIe cable"
+      - "SATA power cables"
+      - "Custom sleeved cables"
+
+  - query_pattern: "home office"
+    recommended_products:
+      - "HDMI cable"
+      - "USB-C cable"
+      - "Ethernet cable"
+      - "USB hub cable"
+
+# Price Ranges
+price_ranges:
+  budget:
+    min: 0
+    max: 20
+    description: "Affordable basic cables"
+
+  standard:
+    min: 20
+    max: 50
+    description: "Quality cables for everyday use"
+
+  premium:
+    min: 50
+    max: 150
+    description: "High-quality cables with premium features"
+
+  custom:
+    min: 80
+    max: 300
+    description: "Custom-made cables with specific requirements"

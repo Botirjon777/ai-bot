@@ -1,0 +1,591 @@
+{
+  "info": {
+    "_postman_id": "ai-bot-api-collection",
+    "name": "AI Cable Store Bot API",
+    "description": "Complete API collection for the AI-powered cable e-commerce chatbot. Includes chat endpoints, system utilities, and admin monitoring capabilities.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "ai-bot-v2"
+  },
+  "item": [
+    {
+      "name": "Chat Endpoints",
+      "description": "User-facing chat and session management endpoints",
+      "item": [
+        {
+          "name": "Initialize Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Test response status",
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "// Parse response",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "// Test session_id exists",
+                  "pm.test(\"Session ID is returned\", function () {",
+                  "    pm.expect(jsonData).to.have.property('session_id');",
+                  "    pm.expect(jsonData.session_id).to.be.a('string');",
+                  "    pm.expect(jsonData.session_id.length).to.be.greaterThan(0);",
+                  "});",
+                  "",
+                  "// Save session_id to environment",
+                  "pm.environment.set(\"session_id\", jsonData.session_id);",
+                  "",
+                  "// Test cookies are set",
+                  "pm.test(\"Session cookies are set\", function () {",
+                  "    pm.expect(pm.cookies.has('session_id')).to.be.true;",
+                  "    pm.expect(pm.cookies.has('session_sig')).to.be.true;",
+                  "});",
+                  "",
+                  "console.log(\"Session initialized:\", jsonData.session_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/session",
+              "host": ["{{base_url}}"],
+              "path": ["api", "session"]
+            },
+            "description": "Initialize a new chat session. Returns a session ID and sets session cookies (session_id and session_sig) for subsequent requests."
+          },
+          "response": []
+        },
+        {
+          "name": "Send Chat Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Test response status",
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "// Test content type is SSE",
+                  "pm.test(\"Response is Server-Sent Events\", function () {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('text/event-stream');",
+                  "});",
+                  "",
+                  "// Test response body contains data",
+                  "pm.test(\"Response contains SSE data\", function () {",
+                  "    const responseText = pm.response.text();",
+                  "    pm.expect(responseText).to.include('data:');",
+                  "});",
+                  "",
+                  "console.log(\"Chat response received (streaming)\");"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Ensure session exists",
+                  "if (!pm.environment.get(\"session_id\")) {",
+                  "    console.error(\"No session_id found. Please run 'Initialize Session' first.\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"message\": \"I need a USB-C cable for my laptop, about 2 meters long\",\n    \"user_info\": {\n        \"timestamp\": \"{{$timestamp}}\"\n    }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat",
+              "host": ["{{base_url}}"],
+              "path": ["api", "chat"]
+            },
+            "description": "Send a chat message and receive streaming AI response with product suggestions. Requires an active session (cookies from Initialize Session)."
+          },
+          "response": []
+        },
+        {
+          "name": "Track Product Click",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test(\"Tracking confirmed\", function () {",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.expect(jsonData.status).to.equal('tracked');",
+                  "});",
+                  "",
+                  "console.log(\"Product click tracked successfully\");"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"product_id\": \"prod_123\",\n    \"query\": \"usb-c cable 2m\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/product-click",
+              "host": ["{{base_url}}"],
+              "path": ["api", "product-click"]
+            },
+            "description": "Track when a user clicks on a product. Used for learning and improving product recommendations."
+          },
+          "response": []
+        },
+        {
+          "name": "Request Human Assistant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test(\"Response message exists\", function () {",
+                  "    pm.expect(jsonData).to.have.property('response');",
+                  "    pm.expect(jsonData.response).to.be.a('string');",
+                  "});",
+                  "",
+                  "console.log(\"Human request response:\", jsonData.response);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"John Doe\",\n    \"email\": \"john.doe@example.com\",\n    \"message\": \"I need help with a custom cable order for my business\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/human-request",
+              "host": ["{{base_url}}"],
+              "path": ["api", "human-request"]
+            },
+            "description": "Request to speak with a human assistant. Response varies based on business hours (Mon-Fri 9-17)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "System Endpoints",
+      "description": "System health, FAQ, and utility endpoints",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test(\"Health status is ok\", function () {",
+                  "    pm.expect(jsonData.status).to.equal('ok');",
+                  "});",
+                  "",
+                  "pm.test(\"All services are present\", function () {",
+                  "    pm.expect(jsonData).to.have.property('ollama');",
+                  "    pm.expect(jsonData).to.have.property('redis');",
+                  "    pm.expect(jsonData).to.have.property('opensearch');",
+                  "});",
+                  "",
+                  "pm.test(\"Environment is set\", function () {",
+                  "    pm.expect(jsonData).to.have.property('environment');",
+                  "    pm.expect(jsonData).to.have.property('model');",
+                  "});",
+                  "",
+                  "// Log service statuses",
+                  "console.log(\"Service Status:\");",
+                  "console.log(\"  Ollama:\", jsonData.ollama);",
+                  "console.log(\"  Redis:\", jsonData.redis);",
+                  "console.log(\"  OpenSearch:\", jsonData.opensearch);",
+                  "console.log(\"  Model:\", jsonData.model);",
+                  "console.log(\"  Environment:\", jsonData.environment);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Comprehensive health check for all services (Ollama, Redis, OpenSearch). Returns connection status for each service."
+          },
+          "response": []
+        },
+        {
+          "name": "Get FAQs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test(\"FAQs are returned\", function () {",
+                  "    pm.expect(jsonData).to.have.property('faqs');",
+                  "    pm.expect(jsonData.faqs).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test(\"Categories are returned\", function () {",
+                  "    pm.expect(jsonData).to.have.property('categories');",
+                  "    pm.expect(jsonData.categories).to.be.an('array');",
+                  "});",
+                  "",
+                  "console.log(\"Total FAQs:\", jsonData.faqs.length);",
+                  "console.log(\"Total Categories:\", jsonData.categories.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/faq",
+              "host": ["{{base_url}}"],
+              "path": ["api", "faq"]
+            },
+            "description": "Get all FAQs organized by category. Returns FAQ questions, answers, and category information."
+          },
+          "response": []
+        },
+        {
+          "name": "Clear Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test(\"Session cleared message\", function () {",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "    pm.expect(jsonData.message).to.equal('Session cleared');",
+                  "});",
+                  "",
+                  "console.log(\"Session cleared successfully\");"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/session/{{session_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "session", "{{session_id}}"]
+            },
+            "description": "Clear/delete a specific session and its conversation history from Redis."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin Endpoints",
+      "description": "Admin monitoring and management endpoints (requires admin API key)",
+      "item": [
+        {
+          "name": "List Active Sessions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test(\"Sessions array exists\", function () {",
+                  "    pm.expect(jsonData).to.have.property('sessions');",
+                  "    pm.expect(jsonData.sessions).to.be.an('array');",
+                  "});",
+                  "",
+                  "// Save first session ID if available",
+                  "if (jsonData.sessions.length > 0) {",
+                  "    pm.environment.set(\"admin_session_id\", jsonData.sessions[0].session_id);",
+                  "    console.log(\"Saved first session ID:\", jsonData.sessions[0].session_id);",
+                  "}",
+                  "",
+                  "console.log(\"Total active sessions:\", jsonData.sessions.length);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-admin-key",
+                "value": "{{admin_api_key}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/sessions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "sessions"]
+            },
+            "description": "List all active sessions with metadata (last activity, TTL, message count). Requires admin API key."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Session History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test(\"Session ID matches\", function () {",
+                  "    pm.expect(jsonData).to.have.property('session_id');",
+                  "});",
+                  "",
+                  "pm.test(\"Messages array exists\", function () {",
+                  "    pm.expect(jsonData).to.have.property('messages');",
+                  "    pm.expect(jsonData.messages).to.be.an('array');",
+                  "});",
+                  "",
+                  "console.log(\"Session:\", jsonData.session_id);",
+                  "console.log(\"Total messages:\", jsonData.messages.length);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Use admin_session_id if available, otherwise fall back to session_id",
+                  "const sessionId = pm.environment.get(\"admin_session_id\") || pm.environment.get(\"session_id\");",
+                  "if (!sessionId) {",
+                  "    console.error(\"No session ID available. Run 'List Active Sessions' or 'Initialize Session' first.\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-admin-key",
+                "value": "{{admin_api_key}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/session/{{session_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "session", "{{session_id}}"]
+            },
+            "description": "Get full chat history for a specific session. Requires admin API key."
+          },
+          "response": []
+        },
+        {
+          "name": "Stream Session (Real-time)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is Server-Sent Events\", function () {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('text/event-stream');",
+                  "});",
+                  "",
+                  "console.log(\"Streaming session updates (SSE)\");"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-admin-key",
+                "value": "{{admin_api_key}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/session/{{session_id}}/stream",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "session", "{{session_id}}", "stream"]
+            },
+            "description": "Subscribe to real-time updates for a session via Server-Sent Events (SSE). Receives new messages as they arrive. Requires admin API key."
+          },
+          "response": []
+        },
+        {
+          "name": "Send Admin Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const jsonData = pm.response.json();",
+                  "",
+                  "pm.test(\"Message sent status\", function () {",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.expect(jsonData.status).to.equal('sent');",
+                  "});",
+                  "",
+                  "pm.test(\"Message content returned\", function () {",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});",
+                  "",
+                  "console.log(\"Admin message sent:\", jsonData.message);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-admin-key",
+                "value": "{{admin_api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"message\": \"Hello! I'm a human assistant. How can I help you today?\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/session/{{session_id}}/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "session", "{{session_id}}", "send"]
+            },
+            "description": "Send a message from admin to a user's session. The message is published via Redis pub/sub for real-time delivery. Requires admin API key."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request script",
+          "console.log(\"Request to:\", pm.request.url.toString());"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script",
+          "const responseTime = pm.response.responseTime;",
+          "console.log(\"Response time:\", responseTime + \"ms\");"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ]
+}
